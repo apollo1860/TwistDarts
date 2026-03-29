@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dartscorer Pro</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Segoe UI;
+  background:linear-gradient(135deg,#0b1a1f,#081014);
+  color:white;
+}
+
+/* SETUP */
+.setup{
+  position:fixed;
+  inset:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:#000a;
+}
+
+.setup-box{
+  background:#111;
+  padding:30px;
+  border-radius:20px;
+  text-align:center;
+}
+
+.setup input{
+  padding:10px;
+  margin:10px;
+  font-size:20px;
+}
+
+/* LAYOUT */
+.container{display:flex;height:100vh;}
+
+.left{width:50%;display:flex;}
+
+.player{
+  flex:1;
+  padding:30px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  transition:0.3s;
+}
+
+.active{opacity:1;filter:none;}
+.inactive{opacity:0.3;filter:grayscale(1);}
+
+.p1{background:#ff4d2d;}
+.p2{background:#ff9a1f;}
+
+.score{font-size:110px;font-weight:900;}
+
+.right{
+  width:50%;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+
+.keypad{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+  width:80%;
+}
+
+.key{
+  padding:30px;
+  font-size:30px;
+  background:#111;
+  border-radius:20px;
+  text-align:center;
+}
+
+.display{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
+}
+
+.display input{
+  padding:20px;
+  font-size:25px;
+}
+
+button{padding:20px;font-size:20px;}
+
+.popup{
+  position:fixed;
+  inset:0;
+  display:none;
+  justify-content:center;
+  align-items:center;
+  background:#000a;
+}
+
+.popup div{
+  background:#111;
+  padding:20px;
+  border-radius:20px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- SETUP -->
+<div class="setup" id="setup">
+  <div class="setup-box">
+    <h2>Match Setup</h2>
+    <input id="legsInput" type="number" min="1" max="10" value="3"><br>
+    <button onclick="start()">Start</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- LEFT -->
+  <div class="left">
+    <div id="p0" class="player p1 active">
+      <h2>Spieler 1</h2>
+      <div class="score" id="score0">0</div>
+      Avg: <span id="avg0">0</span><br>
+      Darts: <span id="darts0">0</span><br>
+      Legs: <span id="legs0">0</span>
+    </div>
+
+    <div id="p1" class="player p2 inactive">
+      <h2>Spieler 2</h2>
+      <div class="score" id="score1">0</div>
+      Avg: <span id="avg1">0</span><br>
+      Darts: <span id="darts1">0</span><br>
+      Legs: <span id="legs1">0</span>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+
+    <div class="display">
+      <input id="input">
+      <button onclick="submit()">OK</button>
+    </div>
+
+    <div class="keypad">
+      <div class="key" onclick="add(1)">1</div>
+      <div class="key" onclick="add(2)">2</div>
+      <div class="key" onclick="add(3)">3</div>
+      <div class="key" onclick="add(4)">4</div>
+      <div class="key" onclick="add(5)">5</div>
+      <div class="key" onclick="add(6)">6</div>
+      <div class="key" onclick="add(7)">7</div>
+      <div class="key" onclick="add(8)">8</div>
+      <div class="key" onclick="add(9)">9</div>
+      <div class="key" onclick="clearInput()">C</div>
+      <div class="key" onclick="add(0)">0</div>
+      <div class="key" onclick="back()">⌫</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CHECKOUT POPUP -->
+<div class="popup" id="popup">
+  <div>
+    <h3>Checkout Darts?</h3>
+    <button onclick="finish(1)">1</button>
+    <button onclick="finish(2)">2</button>
+    <button onclick="finish(3)">3</button>
+  </div>
+</div>
+
+<script>
+let s;
+
+function start(){
+  let t=Math.max(1,Math.min(10,+legsInput.value));
+  s={
+    target:t,
+    player:0,
+    phase:"pre",
+    preScore:[0,0],
+    preDarts:[0,0],
+    remaining:[0,0],
+    totalScore:[0,0],
+    totalDarts:[0,0],
+    legs:[0,0]
+  };
+  setup.style.display="none";
+  render();
+}
+
+function setActive(){
+  p0.classList.toggle("active",s.player===0);
+  p1.classList.toggle("active",s.player===1);
+  p0.classList.toggle("inactive",s.player!==0);
+  p1.classList.toggle("inactive",s.player!==1);
+}
+
+function avg(p){
+  if(!s.totalDarts[p]) return "0.00";
+  return ((s.totalScore[p]/s.totalDarts[p])*3).toFixed(2);
+}
+
+function render(){
+  score0.textContent=s.remaining[0];
+  score1.textContent=s.remaining[1];
+  darts0.textContent=s.totalDarts[0];
+  darts1.textContent=s.totalDarts[1];
+  avg0.textContent=avg(0);
+  avg1.textContent=avg(1);
+  legs0.textContent=s.legs[0];
+  legs1.textContent=s.legs[1];
+  setActive();
+}
+
+function add(n){input.value+=n;}
+function clearInput(){input.value="";}
+function back(){input.value=input.value.slice(0,-1);}
+
+function submit(){
+  let pts=+input.value;
+  if(pts<0||pts>180)return;
+
+  if(s.phase==="pre"){
+    s.preScore[s.player]+=pts;
+    s.preDarts[s.player]+=3;
+
+    s.player=1-s.player;
+
+    if(s.preDarts[0]>=9 && s.preDarts[1]>=9){
+      s.remaining[0]=s.preScore[1];
+      s.remaining[1]=s.preScore[0];
+      s.phase="leg";
+      s.player=0;
+    }
+  } else {
+
+    if(pts===s.remaining[s.player]){
+      window.tmp=pts;
+      popup.style.display="flex";
+      return;
+    }
+
+    if(pts>s.remaining[s.player]) return;
+
+    s.remaining[s.player]-=pts;
+    s.totalScore[s.player]+=pts;
+    s.totalDarts[s.player]+=3;
+
+    s.player=1-s.player;
+  }
+
+  input.value="";
+  render();
+}
+
+function finish(d){
+  popup.style.display="none";
+
+  let p=s.player;
+
+  s.remaining[p]=0;
+  s.totalScore[p]+=window.tmp;
+  s.totalDarts[p]+=d;
+
+  s.legs[p]++;
+
+  if(s.legs[p]>=s.target){
+    alert("Gewinner Spieler "+(p+1));
+    location.reload();
+    return;
+  }
+
+  s.phase="pre";
+  s.preScore=[0,0];
+  s.preDarts=[0,0];
+  s.remaining=[0,0];
+  s.player=0;
+
+  render();
+}
+</script>
+
+</body>
+</html>
