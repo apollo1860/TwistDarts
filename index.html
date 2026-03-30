@@ -14,15 +14,16 @@ body{margin:0;font-family:Segoe UI;background:#0b1a1f;color:white;}
 .inactive{opacity:.2;filter:grayscale(1);}
 .p1{background:#ff4d2d;}
 .p2{background:#ff9a1f;}
-.score{font-size:100px;font-weight:900;}
+.score{font-size:110px;font-weight:900;}
+.stats{font-size:26px;line-height:1.6;}
 .right{width:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;}
 .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;width:80%;}
-.key{padding:30px;font-size:30px;background:#111;border-radius:20px;text-align:center;}
+.key{padding:30px;font-size:30px;background:#111;border-radius:20px;text-align:center;cursor:pointer;}
 .display{display:flex;gap:10px;margin-bottom:20px;}
 .display input{padding:20px;font-size:25px;}
 button{padding:15px;font-size:18px;margin:5px;}
 .popup{position:fixed;inset:0;display:none;justify-content:center;align-items:center;background:#000a;}
-.popup div{background:#111;padding:20px;border-radius:20px;}
+.popup div{background:#111;padding:25px;border-radius:20px;text-align:center;}
 .setup{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;background:#000a;}
 .setup-box{background:#111;padding:30px;border-radius:20px;text-align:center;}
 </style>
@@ -48,25 +49,29 @@ First to: <input id="legsInput" type="number" min="1" max="10" value="3"><br><br
 <div id="p0" class="player p1 active">
 <h2>Spieler 1</h2>
 <div class="score" id="score0">0</div>
+<div class="stats">
 Avg: <span id="avg0">0</span><br>
-Darts (Leg): <span id="darts0">0</span><br>
+Darts: <span id="darts0">0</span><br>
 Legs: <span id="legs0">0</span>
+</div>
 </div>
 
 <div id="p1" class="player p2 inactive">
 <h2 id="name1">Spieler 2</h2>
 <div class="score" id="score1">0</div>
+<div class="stats">
 Avg: <span id="avg1">0</span><br>
-Darts (Leg): <span id="darts1">0</span><br>
+Darts: <span id="darts1">0</span><br>
 Legs: <span id="legs1">0</span>
+</div>
 </div>
 </div>
 
 <div class="right">
-
 <div class="display">
 <input id="input">
 <button onclick="submit()">OK</button>
+<button onclick="applyRest()">Rest</button>
 <button onclick="undo()">↩</button>
 </div>
 
@@ -84,7 +89,6 @@ Legs: <span id="legs1">0</span>
 <div class="key" onclick="add(0)">0</div>
 <div class="key" onclick="back()">⌫</div>
 </div>
-
 </div>
 </div>
 
@@ -97,55 +101,47 @@ Legs: <span id="legs1">0</span>
 </div>
 </div>
 
+<div class="popup" id="endPopup">
+<div>
+<h2 id="winner"></h2>
+<p id="stats"></p>
+<button onclick="location.reload()">Neues Spiel</button>
+</div>
+</div>
+
 <script>
-let s;
-let history=[];
+let s,history=[];
+const BOT=[22,25,24,26,36,38,39,40,41,43,45,46,47,48,60,64,66,80,81,83,85,90,93,96,100,121,123,125,140,180];
 
-const BOT_SCORES=[22,25,24,26,36,38,39,40,41,43,45,46,47,48,60,64,66,80,81,83,85,90,93,96,100,121,123,125,140,180];
-
-function clone(){ return JSON.parse(JSON.stringify(s)); }
+function clone(){return JSON.parse(JSON.stringify(s));}
+function save(){history.push(clone());}
+function undo(){if(history.length){s=history.pop();render();}}
 
 function start(){
 s={
 target:Math.max(1,Math.min(10,+legsInput.value)),
-player:0,
-phase:"pre",
+player:0,starter:0,phase:"pre",
 bot:mode.value==="bot",
-preScore:[0,0],
-preDarts:[0,0],
+preScore:[0,0],preDarts:[0,0],
 remaining:[0,0],
-totalScore:[0,0],
-totalDarts:[0,0],
-legDarts:[0,0],
-legs:[0,0]
+totalScore:[0,0],totalDarts:[0,0],
+legDarts:[0,0],legs:[0,0],
+maxFinish:[0,0],max180:[0,0],
+legScores:[[],[]]
 };
 history=[];
 if(s.bot) name1.textContent="Dartbot";
 setup.style.display="none";
-render();
-botTurn();
+render();botTurn();
 }
 
-function undo(){
-if(history.length===0) return;
-s=history.pop();
-render();
-}
-
-function save(){ history.push(clone()); }
-
-function avg(p){
-if(!s.totalDarts[p]) return "0.00";
-return ((s.totalScore[p]/s.totalDarts[p])*3).toFixed(2);
-}
-
+function avg(p){return s.totalDarts[p]?((s.totalScore[p]/s.totalDarts[p])*3).toFixed(2):"0.00";}
 function setActive(){
 p0.classList.toggle("active",s.player===0);
 p1.classList.toggle("active",s.player===1);
 p0.classList.toggle("inactive",s.player!==0);
 p1.classList.toggle("inactive",s.player!==1);
 }
-
 function render(){
 score0.textContent=s.remaining[0];
 score1.textContent=s.remaining[1];
@@ -162,10 +158,18 @@ function add(n){input.value+=n;}
 function clearInput(){input.value="";}
 function back(){input.value=input.value.slice(0,-1);}
 
+function applyRest(){
+let newRest=+input.value;
+let current=s.remaining[s.player];
+if(newRest>=0 && newRest<current){
+input.value=current-newRest;
+submit();
+}
+}
+
 function submit(){
 let pts=+input.value;
 if(pts<0||pts>180)return;
-
 save();
 
 if(s.phase==="pre"){
@@ -179,16 +183,15 @@ if(s.preDarts[0]>=9 && s.preDarts[1]>=9){
 s.remaining[0]=s.preScore[1];
 s.remaining[1]=s.preScore[0];
 s.phase="leg";
-s.player=0;
+s.player=s.starter;
 }
 
-} else {
-
+}else{
 let newScore=s.remaining[s.player]-pts;
 
-// BUST RULES
 if(newScore<0 || newScore===1){
 s.player=1-s.player;
+input.value="";
 render();
 return;
 }
@@ -204,6 +207,8 @@ s.totalScore[s.player]+=pts;
 s.totalDarts[s.player]+=3;
 s.legDarts[s.player]+=3;
 
+if(pts===180)s.max180[s.player]++;
+
 s.player=1-s.player;
 }
 
@@ -213,6 +218,8 @@ botTurn();
 }
 
 function finish(d){
+input.value=""; // FIX BUG
+
 popup.style.display="none";
 let p=s.player;
 
@@ -221,57 +228,74 @@ s.totalScore[p]+=window.tmp;
 s.totalDarts[p]+=d;
 s.legDarts[p]+=d;
 
+s.maxFinish[p]=Math.max(s.maxFinish[p],window.tmp);
+
 s.legs[p]++;
+s.legScores[p].push(s.legDarts[p]);
 
 if(s.legs[p]>=s.target){
-alert("Gewinner: "+(p===1&&s.bot?"Dartbot":"Spieler "+(p+1)));
-location.reload();
+endGame(p);
 return;
 }
+
+// Switch starter
+s.starter=1-s.starter;
+s.player=s.starter;
 
 s.phase="pre";
 s.preScore=[0,0];
 s.preDarts=[0,0];
 s.remaining=[0,0];
 s.legDarts=[0,0];
-s.player=0;
+
+input.value=""; // DOUBLE SAFETY
 
 render();
 botTurn();
 }
 
+function endGame(w){
+let best=Math.min(...s.legScores[w]);
+let worst=Math.max(...s.legScores[w]);
+
+winner.textContent="Gewinner: "+(w===1&&s.bot?"Dartbot":"Spieler "+(w+1));
+stats.innerHTML=`
+Avg: ${avg(0)} / ${avg(1)}<br>
+Best Leg: ${best} Darts<br>
+Worst Leg: ${worst} Darts<br>
+Highest Finish: ${s.maxFinish[0]} / ${s.maxFinish[1]}<br>
+180s: ${s.max180[0]} / ${s.max180[1]}`;
+
+endPopup.style.display="flex";
+}
+
 function botTurn(){
-if(!s.bot || s.player!==1) return;
+if(!s.bot || s.player!==1)return;
 
 setTimeout(()=>{
-
 let pts;
 
 if(s.phase==="pre"){
-pts=BOT_SCORES[Math.floor(Math.random()*BOT_SCORES.length)];
-} else {
+pts=BOT[Math.floor(Math.random()*BOT.length)];
+}else{
+let r=s.remaining[1],c=0;
+if(r>=100)c=0.05;
+else if(r>=60)c=0.10;
+else if(r>=40)c=0.20;
+else if(r>=2)c=0.40;
 
-let rest=s.remaining[1];
-let chance=0;
-
-if(rest>=100&&rest<=170) chance=0.05;
-else if(rest>=60&&rest<=99) chance=0.10;
-else if(rest>=40&&rest<=59) chance=0.20;
-else if(rest>=2&&rest<=39) chance=0.40;
-
-if(Math.random()<chance && rest!==1){
-window.tmp=rest;
+if(Math.random()<c && r!==1){
+window.tmp=r;
 finish(Math.floor(Math.random()*3)+1);
 return;
 }
 
-let possible=BOT_SCORES.filter(x=>x<=rest && rest-x!==1);
-pts=possible.length?possible[Math.floor(Math.random()*possible.length)]:0;
+let p=BOT.filter(x=>x<=r && r-x!==1);
+pts=p.length?p[Math.floor(Math.random()*p.length)]:0;
 }
 
 input.value=pts;
 submit();
-
 },700);
 }
 </script>
